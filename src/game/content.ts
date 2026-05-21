@@ -1,4 +1,4 @@
-export type PegKind = 'story' | 'spark' | 'anchor' | 'villain';
+export type PegKind = 'story' | 'spark' | 'anchor' | 'villain' | 'multiball' | 'slowmo' | 'bumper';
 
 export type Character = {
   id: string;
@@ -6,6 +6,7 @@ export type Character = {
   role: string;
   color: string;
   quote: string;
+  portrait: { hair: string; skin: string; shirt: string; accessory: string };
 };
 
 export type LevelDef = {
@@ -21,10 +22,11 @@ export type LevelDef = {
 };
 
 export const characters: Character[] = [
-  { id: 'diego', name: 'Diego', role: 'o sobrevivente do quarto gamer', color: '#60a5fa', quote: 'Eu só queria jogar, mano.' },
-  { id: 'digueu', name: 'Digueu', role: 'teórico da fenda fedida', color: '#fb7185', quote: 'Isso aí é responsabilidade quântica.' },
-  { id: 'felipinho', name: 'Felipinho', role: 'analista de caos', color: '#c084fc', quote: 'Eu falei que o Discord dava problema.' },
-  { id: 'bolao', name: 'Bolão', role: 'motoca e gerador de portal', color: '#f59e0b', quote: 'Com 10.000 W não tem erro.' },
+  { id: 'diego', name: 'Diego', role: 'o sobrevivente do quarto gamer', color: '#60a5fa', quote: 'Eu só queria jogar, mano.', portrait: { hair: '#7c2d12', skin: '#f8c99b', shirt: '#2563eb', accessory: '#111827' } },
+  { id: 'digueu', name: 'Digueu', role: 'teórico da fenda fedida', color: '#fb7185', quote: 'Isso aí é responsabilidade quântica.', portrait: { hair: '#111827', skin: '#9f6b45', shirt: '#334155', accessory: '#f8fafc' } },
+  { id: 'felipinho', name: 'Felipinho', role: 'analista de caos', color: '#c084fc', quote: 'Eu falei que o Discord dava problema.', portrait: { hair: '#172554', skin: '#d6a06f', shirt: '#1e40af', accessory: '#38bdf8' } },
+  { id: 'bolao', name: 'Bolão', role: 'motoca e gerador de portal', color: '#f59e0b', quote: 'Com 10.000 W não tem erro.', portrait: { hair: '#0f172a', skin: '#b77950', shirt: '#0f172a', accessory: '#fbbf24' } },
+  { id: 'criador', name: 'Criador', role: 'cientista suspeito da fenda', color: '#a3e635', quote: 'Eu criei a fenda. Foi necessário.', portrait: { hair: '#a3a3a3', skin: '#c08457', shirt: '#365314', accessory: '#bef264' } },
 ];
 
 export const levels: LevelDef[] = [
@@ -91,4 +93,21 @@ export const comboNames = [
   'Bufa encadeada',
   'Combo fedoretto',
   'Catástrofe intestinal quântica',
+  'FEVER DA RUPTURA',
+];
+
+export const achievementDefs = [
+  { id: 'first-fart', label: 'Primeira bufa', test: (_score: number, _combo: number, hits: number) => hits >= 1 },
+  { id: 'combo-6', label: 'Combo 6x', test: (_score: number, combo: number) => combo >= 6 },
+  { id: 'score-5000', label: '5K de caos', test: (score: number) => score >= 5000 },
+  { id: 'score-15000', label: '15K fedido', test: (score: number) => score >= 15000 },
+];
+
+export const dialogueLines = [
+  'Intrusos! Intrusos!',
+  'Blup blup detectado.',
+  'Não respira fundo agora.',
+  'O bueiro dimensional aprovou essa jogada.',
+  'Quando der errado, o peido será sempre o vilão.',
+  'Continua... mas com mais partículas.',
 ];

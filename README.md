@@ -10,11 +10,13 @@ Protótipo jogável evoluído:
 - Disparo com click ou espaço
 - Física lenta estilo Peggle, com ricochete controlado
 - Cinco fases inspiradas no PEIDE: quarto gamer, Bolão, Planeta Eg, fábrica e fenda final
-- Personagens selecionáveis: Diego, Digueu, Felipinho e Bolão
-- Pegs por tipo (`story`, `spark`, `anchor`, `villain`)
+- Personagens selecionáveis: Diego, Digueu, Felipinho, Bolão e Criador, agora com retratos estilizados em canvas
+- Pegs por tipo (`story`, `spark`, `anchor`, `villain`, `multiball`, `slowmo`, `bumper`)
+- Power-ups: multibola, câmera lenta, bumpers, fever mode, bucket/bueiro com bônus de tiro
+- Física mais arcade: ricochetes de bumper, shake de impacto, rastro da bola e slow-motion em jogadas fortes
 - Som procedural de peido por impacto/combo
-- Partículas de gás, bucket móvel, bônus de tiro e tela de resultado
-- Pontuação, tiros, fase, personagem e alvos restantes
+- Partículas de gás, pontuação flutuante, badges locais, high score local e tela de resultado
+- Pontuação, tiros, fase, personagem, recorde e alvos restantes
 - Reset com `R`
 
 Deploy: https://pebble-ten.vercel.app

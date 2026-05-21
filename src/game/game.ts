@@ -1,9 +1,11 @@
 import { PeideAudio } from './audio';
-import { characters, comboNames, levels, type Character, type LevelDef, type PegKind } from './content';
+import { achievementDefs, characters, comboNames, dialogueLines, levels, type Character, type LevelDef, type PegKind } from './content';
 
 type Vec = { x: number; y: number };
 type Peg = Vec & { radius: number; hit: boolean; kind: PegKind; pulse: number };
 type Ball = Vec & { vx: number; vy: number; radius: number; active: boolean };
+type FloatingText = Vec & { text: string; life: number; color: string };
+type TrailDot = Vec & { life: number; radius: number; color: string };
 type GameState = 'start' | 'playing' | 'level-clear' | 'game-over' | 'finished';
 
 const W = 960;
@@ -17,7 +19,8 @@ export class PebbleGame {
   private ctx: CanvasRenderingContext2D;
   private audio = new PeideAudio();
   private aim: Vec = { x: W / 2, y: 260 };
-  private ball: Ball = { x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 8, active: false };
+  private balls: Ball[] = [{ x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 8, active: false }];
+  private get ball() { return this.balls[0]; }
   private pegs: Peg[] = [];
   private levelIndex = 0;
   private characterIndex = 0;
@@ -26,9 +29,17 @@ export class PebbleGame {
   private shotScore = 0;
   private shotHits = 0;
   private combo = 1;
+  private fever = 0;
+  private slowmo = 0;
+  private shake = 0;
+  private bestScore = Number(localStorage.getItem('pebble-best-score') || 0);
+  private achievements = new Set<string>(JSON.parse(localStorage.getItem('pebble-achievements') || '[]') as string[]);
   private message = 'Clique para começar a ruptura.';
   private state: GameState = 'start';
   private raf = 0;
+  private floatingTexts: FloatingText[] = [];
+  private trails: TrailDot[] = [];
+  private activeBall: Ball | null = null;
 
   private canvas: HTMLCanvasElement;
   private hud: { score: HTMLElement; shots: HTMLElement; targets: HTMLElement; level: HTMLElement; character: HTMLElement };
@@ -122,7 +133,7 @@ export class PebbleGame {
   private loadLevel(index: number) {
     this.levelIndex = index;
     this.shots = this.level.shots;
-    this.ball = { x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 8, active: false };
+    this.balls = [{ x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 8, active: false }];
     this.pegs = this.makeLevel(this.level);
     this.shotScore = 0;
     this.shotHits = 0;
@@ -137,7 +148,8 @@ export class PebbleGame {
       const start = W / 2 - ((count - 1) * 61) / 2;
       for (let i = 0; i < count; i += 1) {
         const villain = level.id === 'fenda-final' && row === 3 && i === Math.floor(count / 2);
-        const kind: PegKind = villain ? 'villain' : (row + i) % 7 === 0 ? 'anchor' : (row * 3 + i) % 5 === 0 ? 'spark' : 'story';
+        const special = (row * 11 + i * 7 + level.id.length) % 17;
+        const kind: PegKind = villain ? 'villain' : special === 0 ? 'multiball' : special === 1 ? 'slowmo' : special === 2 ? 'bumper' : (row + i) % 7 === 0 ? 'anchor' : (row * 3 + i) % 5 === 0 ? 'spark' : 'story';
         pegs.push({
           x: start + i * 61 + Math.sin(row * 1.7 + i) * 9,
           y: y + Math.sin(i * 1.3 + row) * 10,
@@ -149,7 +161,7 @@ export class PebbleGame {
       }
     });
     for (let i = 0; i < 12; i += 1) {
-      pegs.push({ x: 145 + i * 58, y: 565 + Math.sin(i) * 8, radius: 11, hit: false, kind: i % 3 === 0 ? 'spark' : 'anchor', pulse: i });
+      pegs.push({ x: 145 + i * 58, y: 565 + Math.sin(i) * 8, radius: 11, hit: false, kind: i % 4 === 0 ? 'bumper' : i % 3 === 0 ? 'spark' : 'anchor', pulse: i });
     }
     return pegs;
   }
@@ -166,6 +178,10 @@ export class PebbleGame {
     return this.pegs.filter((p) => (p.kind === 'story' || p.kind === 'villain') && !p.hit).length;
   }
 
+  private pegColor(kind: PegKind) {
+    return kind === 'villain' ? '#a855f7' : kind === 'multiball' ? '#fb7185' : kind === 'slowmo' ? '#22d3ee' : kind === 'bumper' ? '#f97316' : kind === 'spark' ? this.level.palette.accent : kind === 'anchor' ? '#facc15' : this.level.palette.peg;
+  }
+
   private shotVector(power = this.level.power) {
     const dx = this.aim.x - launcher.x;
     const dy = Math.max(90, this.aim.y - launcher.y);
@@ -174,9 +190,9 @@ export class PebbleGame {
   }
 
   private fire() {
-    if (this.ball.active || this.shots <= 0) return;
+    if (this.balls.some((b) => b.active) || this.shots <= 0) return;
     const shot = this.shotVector();
-    this.ball = { x: launcher.x, y: launcher.y, vx: shot.vx, vy: shot.vy, radius: 8, active: true };
+    this.balls = [{ x: launcher.x, y: launcher.y, vx: shot.vx, vy: shot.vy, radius: 8, active: true }];
     this.shots -= 1;
     this.shotScore = 0;
     this.shotHits = 0;
@@ -188,73 +204,118 @@ export class PebbleGame {
   }
 
   private update() {
-    if (this.ball.active) {
-      for (let i = 0; i < 2; i += 1) this.stepPhysics();
+    const steps = this.slowmo > 0 ? 1 : 2;
+    for (const ball of this.balls.filter((b) => b.active)) {
+      this.activeBall = ball;
+      for (let i = 0; i < steps; i += 1) this.stepPhysics();
+      if (ball.active) this.trails.push({ x: ball.x, y: ball.y, life: 1, radius: ball.radius, color: this.fever > 0 ? '#fef08a' : '#bef264' });
     }
+    this.activeBall = null;
+    if (this.balls.some((b) => b.active) && this.balls.every((b) => !b.active || b.y > H + 80)) this.endShot();
     for (const peg of this.pegs) peg.pulse += 0.035;
+    this.fever = Math.max(0, this.fever - 1);
+    this.slowmo = Math.max(0, this.slowmo - 1);
+    this.shake = Math.max(0, this.shake * 0.88 - 0.05);
+    for (const t of this.floatingTexts) { t.y -= 0.65; t.life -= 0.018; }
+    this.floatingTexts = this.floatingTexts.filter((t) => t.life > 0);
+    for (const t of this.trails) t.life -= 0.035;
+    this.trails = this.trails.filter((t) => t.life > 0);
   }
 
   private stepPhysics() {
-    this.ball.vy += this.level.gravity;
-    this.ball.vx *= airFriction;
-    this.ball.vy *= airFriction;
-    this.ball.x += this.ball.vx;
-    this.ball.y += this.ball.vy;
+    const ball = this.activeBall ?? this.ball;
+    ball.vy += this.level.gravity * (this.slowmo > 0 ? 0.72 : 1);
+    ball.vx *= airFriction;
+    ball.vy *= airFriction;
+    ball.x += ball.vx;
+    ball.y += ball.vy;
 
-    if (this.ball.x < this.ball.radius || this.ball.x > W - this.ball.radius) {
-      this.ball.vx *= -wallBounce;
-      this.ball.x = Math.max(this.ball.radius, Math.min(W - this.ball.radius, this.ball.x));
+    if (ball.x < ball.radius || ball.x > W - ball.radius) {
+      ball.vx *= -wallBounce;
+      ball.x = Math.max(ball.radius, Math.min(W - ball.radius, ball.x));
+      this.shake += 0.7;
       this.audio.tone(120, 0.035, 'square', 0.018);
     }
-    if (this.ball.y < this.ball.radius) {
-      this.ball.vy *= -wallBounce;
-      this.ball.y = this.ball.radius;
+    if (ball.y < ball.radius) {
+      ball.vy *= -wallBounce;
+      ball.y = ball.radius;
       this.audio.tone(140, 0.035, 'square', 0.018);
     }
 
     const collisions = this.pegs
       .filter((peg) => !peg.hit)
-      .map((peg) => ({ peg, dist: Math.hypot(this.ball.x - peg.x, this.ball.y - peg.y) }))
-      .filter(({ peg, dist }) => dist < this.ball.radius + peg.radius)
+      .map((peg) => ({ peg, dist: Math.hypot(ball.x - peg.x, ball.y - peg.y) }))
+      .filter(({ peg, dist }) => dist < ball.radius + peg.radius)
       .sort((a, b) => a.dist - b.dist)
       .slice(0, 2);
-    for (const { peg, dist } of collisions) this.collidePeg(peg, dist);
+    for (const { peg, dist } of collisions) this.collidePeg(peg, dist, ball);
 
-    if (this.ball.y > H + 80) this.endShot();
+    if (ball.y > H + 80) ball.active = false;
   }
 
-  private collidePeg(peg: Peg, dist: number) {
+  private collidePeg(peg: Peg, dist: number, ball: Ball) {
     peg.hit = true;
-    const dx = this.ball.x - peg.x;
-    const dy = this.ball.y - peg.y;
+    const dx = ball.x - peg.x;
+    const dy = ball.y - peg.y;
     const nx = dx / (dist || 1);
     const ny = dy / (dist || 1);
-    const min = this.ball.radius + peg.radius;
-    const incoming = this.ball.vx * nx + this.ball.vy * ny;
+    const min = ball.radius + peg.radius;
+    const incoming = ball.vx * nx + ball.vy * ny;
+    const bounce = peg.kind === 'bumper' ? 1.18 : pegBounce;
     if (incoming < 0) {
-      this.ball.vx = (this.ball.vx - 2 * incoming * nx) * pegBounce;
-      this.ball.vy = (this.ball.vy - 2 * incoming * ny) * pegBounce;
+      ball.vx = (ball.vx - 2 * incoming * nx) * bounce;
+      ball.vy = (ball.vy - 2 * incoming * ny) * bounce;
     } else {
-      this.ball.vx += nx * 0.16;
-      this.ball.vy += ny * 0.16;
+      ball.vx += nx * (peg.kind === 'bumper' ? 0.8 : 0.16);
+      ball.vy += ny * (peg.kind === 'bumper' ? 0.8 : 0.16);
     }
-    this.ball.x = peg.x + nx * (min + 0.4);
-    this.ball.y = peg.y + ny * (min + 0.4);
+    ball.x = peg.x + nx * (min + 0.4);
+    ball.y = peg.y + ny * (min + 0.4);
 
-    const base = peg.kind === 'villain' ? 500 : peg.kind === 'story' ? 100 : peg.kind === 'spark' ? 60 : 35;
+    if (peg.kind === 'multiball') this.spawnMultiball(ball);
+    if (peg.kind === 'slowmo') this.slowmo = 150;
+    if (peg.kind === 'bumper') this.shake += 4;
+
+    const base = peg.kind === 'villain' ? 500 : peg.kind === 'story' ? 100 : peg.kind === 'multiball' ? 180 : peg.kind === 'slowmo' ? 160 : peg.kind === 'bumper' ? 140 : peg.kind === 'spark' ? 60 : 35;
     const points = base * this.combo;
     this.score += points;
+    this.bestScore = Math.max(this.bestScore, this.score);
+    localStorage.setItem('pebble-best-score', String(this.bestScore));
     this.shotScore += points;
     this.shotHits += 1;
-    this.combo = Math.min(8, this.combo + 1);
-    this.audio.fart(peg.kind, this.combo);
+    this.combo = Math.min(10, this.combo + 1);
+    if (this.combo >= 6) this.fever = 260;
+    this.shake += peg.kind === 'villain' ? 9 : 1.6;
+    this.audio.fart(peg.kind === 'multiball' || peg.kind === 'slowmo' || peg.kind === 'bumper' ? 'spark' : peg.kind, this.combo);
     this.spawnGas(peg.x, peg.y, peg.kind);
+    this.floatingTexts.push({ x: peg.x, y: peg.y - 18, text: `+${points}`, life: 1, color: peg.kind === 'villain' ? '#f0abfc' : '#fef08a' });
+    this.checkAchievements();
+    if (this.shotHits % 5 === 0) this.message = dialogueLines[(this.shotHits + this.levelIndex) % dialogueLines.length];
     this.syncHud();
   }
 
+  private spawnMultiball(source: Ball) {
+    if (this.balls.filter((b) => b.active).length >= 4) return;
+    this.balls.push(
+      { ...source, vx: source.vx * 0.72 + 1.9, vy: source.vy * 0.82 - 1.2, active: true },
+      { ...source, vx: source.vx * 0.72 - 1.9, vy: source.vy * 0.82 - 1.2, active: true },
+    );
+    this.message = 'MULTIBUFA! Duas bolas extras entraram na fenda.';
+  }
+
+  private checkAchievements() {
+    for (const achievement of achievementDefs) {
+      if (!this.achievements.has(achievement.id) && achievement.test(this.score, this.combo, this.shotHits)) {
+        this.achievements.add(achievement.id);
+        localStorage.setItem('pebble-achievements', JSON.stringify([...this.achievements]));
+        this.floatingTexts.push({ x: W / 2, y: 96, text: `Badge: ${achievement.label}`, life: 1.8, color: '#67e8f9' });
+        this.audio.tone(880, 0.16, 'triangle', 0.05);
+      }
+    }
+  }
+
   private endShot() {
-    this.ball.active = false;
-    this.ball = { x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 8, active: false };
+    this.balls = [{ x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 8, active: false }];
     const remaining = this.targetsLeft();
     this.message = this.endOfShotMessage(remaining);
     if (remaining === 0) {
@@ -276,7 +337,7 @@ export class PebbleGame {
   private gas: Array<Vec & { life: number; color: string; vx: number; vy: number }> = [];
 
   private spawnGas(x: number, y: number, kind: PegKind) {
-    const color = kind === 'villain' ? '#a855f7' : kind === 'spark' ? '#22d3ee' : '#a3e635';
+    const color = kind === 'villain' ? '#a855f7' : kind === 'multiball' ? '#fb7185' : kind === 'slowmo' ? '#22d3ee' : kind === 'bumper' ? '#f97316' : kind === 'spark' ? '#22d3ee' : '#a3e635';
     for (let i = 0; i < (kind === 'villain' ? 32 : 14); i += 1) {
       const a = Math.random() * Math.PI * 2;
       const speed = 0.4 + Math.random() * 1.8;
@@ -296,6 +357,8 @@ export class PebbleGame {
 
   private draw() {
     this.updateGas();
+    this.ctx.save();
+    if (this.shake > 0.1) this.ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
     const p = this.level.palette;
     const gradient = this.ctx.createLinearGradient(0, 0, 0, H);
     gradient.addColorStop(0, p.top);
@@ -310,10 +373,14 @@ export class PebbleGame {
     this.drawLauncher();
     this.drawTrajectory();
     for (const peg of this.pegs) this.drawPeg(peg);
+    this.drawTrails();
     this.drawGas();
-    this.drawBall();
+    this.drawBalls();
+    this.drawFloatingTexts();
+    this.drawPortraitStrip();
     this.drawMessage();
     if (this.state !== 'playing') this.drawOverlay();
+    this.ctx.restore();
   }
 
   private drawStars() {
@@ -427,13 +494,20 @@ export class PebbleGame {
   private drawPeg(peg: Peg) {
     this.ctx.save();
     this.ctx.globalAlpha = peg.hit ? 0.1 : 1;
-    const color = peg.kind === 'villain' ? '#a855f7' : peg.kind === 'spark' ? this.level.palette.accent : peg.kind === 'anchor' ? '#facc15' : this.level.palette.peg;
+    const color = this.pegColor(peg.kind);
     this.ctx.shadowColor = color;
     this.ctx.shadowBlur = peg.hit ? 0 : 10 + Math.sin(peg.pulse) * 4;
     this.ctx.fillStyle = color;
     this.ctx.beginPath();
     this.ctx.arc(peg.x, peg.y, peg.radius + Math.sin(peg.pulse) * 0.8, 0, Math.PI * 2);
     this.ctx.fill();
+    if (!peg.hit && (peg.kind === 'multiball' || peg.kind === 'slowmo' || peg.kind === 'bumper')) {
+      this.ctx.fillStyle = '#020617';
+      this.ctx.font = '900 12px system-ui';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText(peg.kind === 'multiball' ? '×2' : peg.kind === 'slowmo' ? '⏱' : '↯', peg.x, peg.y + 1);
+    }
     this.ctx.shadowBlur = 0;
     this.ctx.strokeStyle = 'rgba(255,255,255,0.72)';
     this.ctx.lineWidth = 2;
@@ -453,16 +527,93 @@ export class PebbleGame {
     this.ctx.restore();
   }
 
-  private drawBall() {
+  private drawTrails() {
     this.ctx.save();
-    this.ctx.shadowColor = '#bef264';
-    this.ctx.shadowBlur = this.ball.active ? 16 : 8;
-    this.ctx.fillStyle = '#ecfccb';
+    for (const t of this.trails) {
+      this.ctx.globalAlpha = t.life * 0.42;
+      this.ctx.fillStyle = t.color;
+      this.ctx.beginPath();
+      this.ctx.arc(t.x, t.y, t.radius * (1.8 - t.life), 0, Math.PI * 2);
+      this.ctx.fill();
+    }
+    this.ctx.restore();
+  }
+
+  private drawBalls() {
+    this.ctx.save();
+    for (const ball of this.balls) {
+      if (!ball.active && ball !== this.ball) continue;
+      this.ctx.shadowColor = this.fever > 0 ? '#fde047' : '#bef264';
+      this.ctx.shadowBlur = ball.active ? 16 : 8;
+      this.ctx.fillStyle = this.fever > 0 ? '#fef08a' : '#ecfccb';
+      this.ctx.beginPath();
+      this.ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.shadowBlur = 0;
+      this.ctx.strokeStyle = '#111827';
+      this.ctx.stroke();
+    }
+    this.ctx.restore();
+  }
+
+  private drawFloatingTexts() {
+    this.ctx.save();
+    this.ctx.textAlign = 'center';
+    this.ctx.font = '900 18px system-ui';
+    for (const t of this.floatingTexts) {
+      this.ctx.globalAlpha = Math.min(1, t.life);
+      this.ctx.fillStyle = t.color;
+      this.ctx.fillText(t.text, t.x, t.y);
+    }
+    this.ctx.restore();
+  }
+
+  private drawPortraitStrip() {
+    this.ctx.save();
+    const x = W - 132;
+    const y = 26;
+    this.ctx.fillStyle = 'rgba(2,6,23,0.62)';
+    this.ctx.fillRect(x - 18, y - 16, 120, 152);
+    this.drawPortrait(this.character, x + 42, y + 48, 42);
+    this.ctx.textAlign = 'center';
+    this.ctx.fillStyle = '#f8fafc';
+    this.ctx.font = '900 15px system-ui';
+    this.ctx.fillText(this.character.name, x + 42, y + 104);
+    this.ctx.fillStyle = '#cbd5e1';
+    this.ctx.font = '700 11px system-ui';
+    this.ctx.fillText(`Best ${this.bestScore}`, x + 42, y + 124);
+    this.ctx.restore();
+  }
+
+  private drawPortrait(character: Character, x: number, y: number, size: number) {
+    const p = character.portrait;
+    this.ctx.save();
+    this.ctx.fillStyle = character.color;
     this.ctx.beginPath();
-    this.ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
+    this.ctx.roundRect(x - size, y - size, size * 2, size * 2, 18);
     this.ctx.fill();
-    this.ctx.shadowBlur = 0;
-    this.ctx.strokeStyle = '#111827';
+    this.ctx.fillStyle = p.skin;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y - 2, size * 0.54, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.fillStyle = p.hair;
+    this.ctx.beginPath();
+    this.ctx.arc(x - 4, y - 18, size * 0.5, Math.PI, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.fillStyle = p.shirt;
+    this.ctx.beginPath();
+    this.ctx.roundRect(x - size * 0.48, y + 22, size * 0.96, size * 0.5, 10);
+    this.ctx.fill();
+    this.ctx.fillStyle = '#0f172a';
+    this.ctx.beginPath();
+    this.ctx.arc(x - 13, y - 2, 3, 0, Math.PI * 2);
+    this.ctx.arc(x + 13, y - 2, 3, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.strokeStyle = p.accessory;
+    this.ctx.lineWidth = 3;
+    this.ctx.beginPath();
+    this.ctx.arc(x - 13, y - 2, 8, 0, Math.PI * 2);
+    this.ctx.arc(x + 13, y - 2, 8, 0, Math.PI * 2);
     this.ctx.stroke();
     this.ctx.restore();
   }
@@ -496,6 +647,10 @@ export class PebbleGame {
     this.ctx.fillStyle = this.character.color;
     this.ctx.font = '800 18px system-ui';
     this.ctx.fillText(`${this.character.name} — ${this.character.role}`, W / 2, 350);
+    this.drawPortrait(this.character, W / 2, 430, 54);
+    this.ctx.fillStyle = '#94a3b8';
+    this.ctx.font = '700 14px system-ui';
+    this.ctx.fillText(`Badges: ${this.achievements.size}/${achievementDefs.length} • Recorde local: ${this.bestScore}`, W / 2, 515);
     this.ctx.restore();
   }
 
