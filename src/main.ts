@@ -63,10 +63,10 @@ const targetsEl = document.querySelector<HTMLElement>('#targets')!;
 
 const W = canvas.width;
 const H = canvas.height;
-const gravity = 0.185;
-const airFriction = 0.9985;
-const wallBounce = 0.94;
-const pegBounce = 1.02;
+const gravity = 0.105;
+const airFriction = 0.9992;
+const wallBounce = 0.82;
+const pegBounce = 0.84;
 const fixedStep = 1 / 120;
 const launcher: Vec = { x: W / 2, y: 46 };
 let aim: Vec = { x: W / 2, y: 260 };
@@ -75,6 +75,8 @@ let shots = 10;
 let pegs: Peg[] = [];
 let ball: Ball = { x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 8, active: false };
 let message = 'Assine os termos e mire na fenda.';
+let shotScore = 0;
+let shotHits = 0;
 let audio: AudioContext | null = null;
 
 function makeLevel() {
@@ -123,7 +125,7 @@ function syncHud() {
   targetsEl.textContent = String(pegs.filter((p) => p.kind === 'story' && !p.hit).length);
 }
 
-function getShotVector(power = 10.9) {
+function getShotVector(power = 6.8) {
   const dx = aim.x - launcher.x;
   const dy = Math.max(90, aim.y - launcher.y);
   const len = Math.hypot(dx, dy) || 1;
@@ -136,9 +138,11 @@ function fire() {
   const shot = getShotVector();
   ball = { x: launcher.x, y: launcher.y, vx: shot.vx, vy: shot.vy, radius: 8, active: true };
   shots -= 1;
-  message = 'Boa sorte. O universo assinou sem ler.';
-  playTone(180, 0.08, 'sawtooth', 0.08);
-  playTone(360, 0.12, 'triangle', 0.05, 0.04);
+  shotScore = 0;
+  shotHits = 0;
+  message = '';
+  playTone(110, 0.07, 'sawtooth', 0.04);
+  playTone(180, 0.09, 'triangle', 0.03, 0.04);
   syncHud();
 }
 
@@ -186,7 +190,7 @@ function stepPhysics(_dt: number) {
     ball.vx = 0;
     ball.vy = 0;
     const remaining = pegs.filter((p) => p.kind === 'story' && !p.hit).length;
-    message = remaining === 0 ? 'Invasão fedorrenta contida!' : shots > 0 ? 'A fenda ainda pulsa. Mire de novo.' : 'Fim de rodada. Pressione R para reabrir os termos.';
+    message = endOfShotMessage(remaining);
     if (remaining === 0) playWin();
   }
 }
@@ -205,18 +209,27 @@ function collidePeg(peg: Peg, dist: number) {
     ball.vx = (ball.vx - 2 * incoming * nx) * pegBounce;
     ball.vy = (ball.vy - 2 * incoming * ny) * pegBounce;
   } else {
-    ball.vx += nx * 0.45;
-    ball.vy += ny * 0.45;
+    ball.vx += nx * 0.16;
+    ball.vy += ny * 0.16;
   }
 
   ball.x = peg.x + nx * (min + 0.4);
   ball.y = peg.y + ny * (min + 0.4);
-  score += peg.kind === 'story' ? 100 : peg.kind === 'spark' ? 60 : 35;
-  message = peg.kind === 'story' ? 'Gás instável neutralizado!' : peg.kind === 'spark' ? 'Ansiedade quântica ativada!' : 'Burrice concentrada ricocheteou!';
-  const freq = peg.kind === 'story' ? 620 : peg.kind === 'spark' ? 880 : 420;
-  playTone(freq, 0.055, 'sine', 0.055);
-  playTone(freq * 1.5, 0.04, 'triangle', 0.025, 0.02);
+  const points = peg.kind === 'story' ? 100 : peg.kind === 'spark' ? 60 : 35;
+  score += points;
+  shotScore += points;
+  shotHits += 1;
+  playFart(peg.kind);
   syncHud();
+}
+
+function endOfShotMessage(remaining: number) {
+  if (remaining === 0) return `INVASÃO CONTIDA! ${shotScore} pontos em ${shotHits} peidos cósmicos.`;
+  if (shotHits === 0) return shots > 0 ? 'Vácuo total. Nem o bueiro acreditou nesse disparo.' : 'Fim de rodada. Pressione R para reabrir os termos.';
+  if (shotScore >= 900) return `COMBO FEDORENTO! ${shotScore} pontos, ${shotHits} pegs atingidos.`;
+  if (shotScore >= 500) return `Bufa encadeada: ${shotScore} pontos em ${shotHits} impactos.`;
+  if (shotScore >= 200) return `Peidinho eficiente: ${shotScore} pontos.`;
+  return `Microbufa registrada: ${shotScore} pontos.`;
 }
 
 function draw() {
@@ -325,7 +338,7 @@ function drawLauncher() {
 
 function drawTrajectory() {
   if (ball.active) return;
-  const shot = getShotVector(10.9);
+  const shot = getShotVector(6.8);
   let px = launcher.x;
   let py = launcher.y;
   let vx = shot.vx;
@@ -391,6 +404,41 @@ function drawMessage() {
 function ensureAudio() {
   audio ??= new AudioContext();
   if (audio.state === 'suspended') void audio.resume();
+}
+
+function playFart(kind: Peg['kind']) {
+  if (!audio) return;
+  const start = audio.currentTime;
+  const duration = kind === 'story' ? 0.18 : kind === 'spark' ? 0.11 : 0.14;
+  const base = kind === 'story' ? 72 : kind === 'spark' ? 115 : 88;
+  const osc = audio.createOscillator();
+  const mod = audio.createOscillator();
+  const modGain = audio.createGain();
+  const gain = audio.createGain();
+  const filter = audio.createBiquadFilter();
+
+  osc.type = 'sawtooth';
+  mod.type = 'sine';
+  osc.frequency.setValueAtTime(base, start);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(35, base * 0.55), start + duration);
+  mod.frequency.setValueAtTime(22, start);
+  modGain.gain.setValueAtTime(kind === 'spark' ? 18 : 28, start);
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(kind === 'spark' ? 520 : 340, start);
+  filter.Q.setValueAtTime(7, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(kind === 'story' ? 0.11 : 0.075, start + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+  mod.connect(modGain);
+  modGain.connect(osc.frequency);
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(audio.destination);
+  osc.start(start);
+  mod.start(start);
+  osc.stop(start + duration + 0.02);
+  mod.stop(start + duration + 0.02);
 }
 
 function playTone(frequency: number, duration: number, type: OscillatorType, volume: number, delay = 0) {
