@@ -39,14 +39,14 @@ app.innerHTML = `
       </div>
       <div class="stats">
         <span>Score <strong id="score">0</strong></span>
-        <span>Shots <strong id="shots">8</strong></span>
+        <span>Shots <strong id="shots">10</strong></span>
         <span>Targets <strong id="targets">0</strong></span>
       </div>
     </section>
     <canvas id="game" width="960" height="640" aria-label="Pebble game canvas"></canvas>
     <section class="controls">
       <p>${theme.winLine}</p>
-      <p><kbd>Mouse</kbd> mira • <kbd>Click</kbd> dispara • <kbd>R</kbd> reinicia</p>
+      <p><kbd>Mouse</kbd> mira • <kbd>Click</kbd>/<kbd>Espaço</kbd> dispara • <kbd>R</kbd> reinicia • som liga no primeiro disparo</p>
     </section>
   </main>
 `;
@@ -63,35 +63,56 @@ const targetsEl = document.querySelector<HTMLElement>('#targets')!;
 
 const W = canvas.width;
 const H = canvas.height;
-const gravity = 0.22;
-const damping = 0.992;
+const gravity = 0.185;
+const airFriction = 0.9985;
+const wallBounce = 0.94;
+const pegBounce = 1.02;
+const fixedStep = 1 / 120;
 const launcher: Vec = { x: W / 2, y: 46 };
 let aim: Vec = { x: W / 2, y: 260 };
 let score = 0;
-let shots = 8;
+let shots = 10;
 let pegs: Peg[] = [];
-let ball: Ball = { x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 9, active: false };
+let ball: Ball = { x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 8, active: false };
 let message = 'Assine os termos e mire na fenda.';
+let audio: AudioContext | null = null;
 
 function makeLevel() {
   const level: Peg[] = [];
-  const rows = [6, 7, 8, 7, 6];
+  const rows = [8, 9, 10, 11, 10, 9, 8, 7];
   rows.forEach((count, row) => {
-    const y = 165 + row * 72;
-    const start = W / 2 - ((count - 1) * 82) / 2;
+    const y = 130 + row * 55;
+    const start = W / 2 - ((count - 1) * 70) / 2;
     for (let i = 0; i < count; i += 1) {
-      const special = (row + i) % 5 === 0 ? 'anchor' : (row * i) % 4 === 0 ? 'spark' : 'story';
-      level.push({ x: start + i * 82, y: y + Math.sin(i + row) * 16, radius: 17, hit: false, kind: special });
+      const kind: Peg['kind'] = (row + i) % 7 === 0 ? 'anchor' : (row * 3 + i) % 5 === 0 ? 'spark' : 'story';
+      level.push({
+        x: start + i * 70 + Math.sin(row * 1.7 + i) * 10,
+        y: y + Math.sin(i * 1.3 + row) * 12,
+        radius: kind === 'anchor' ? 15 : 14,
+        hit: false,
+        kind,
+      });
     }
   });
+
+  for (let i = 0; i < 13; i += 1) {
+    level.push({
+      x: 120 + i * 60,
+      y: 565 + Math.sin(i) * 8,
+      radius: 12,
+      hit: false,
+      kind: i % 3 === 0 ? 'spark' : 'anchor',
+    });
+  }
+
   return level;
 }
 
 function reset() {
   score = 0;
-  shots = 8;
+  shots = 10;
   pegs = makeLevel();
-  ball = { x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 9, active: false };
+  ball = { x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 8, active: false };
   message = 'Assine os termos e mire na fenda.';
   syncHud();
 }
@@ -102,61 +123,60 @@ function syncHud() {
   targetsEl.textContent = String(pegs.filter((p) => p.kind === 'story' && !p.hit).length);
 }
 
+function getShotVector(power = 10.9) {
+  const dx = aim.x - launcher.x;
+  const dy = Math.max(90, aim.y - launcher.y);
+  const len = Math.hypot(dx, dy) || 1;
+  return { vx: (dx / len) * power, vy: (dy / len) * power };
+}
+
 function fire() {
   if (ball.active || shots <= 0) return;
-  const dx = aim.x - launcher.x;
-  const dy = Math.max(80, aim.y - launcher.y);
-  const len = Math.hypot(dx, dy) || 1;
-  const power = 11.5;
-  ball = {
-    x: launcher.x,
-    y: launcher.y,
-    vx: (dx / len) * power,
-    vy: (dy / len) * power,
-    radius: 9,
-    active: true,
-  };
+  ensureAudio();
+  const shot = getShotVector();
+  ball = { x: launcher.x, y: launcher.y, vx: shot.vx, vy: shot.vy, radius: 8, active: true };
   shots -= 1;
-  message = 'Boa sorte.';
+  message = 'Boa sorte. O universo assinou sem ler.';
+  playTone(180, 0.08, 'sawtooth', 0.08);
+  playTone(360, 0.12, 'triangle', 0.05, 0.04);
   syncHud();
 }
 
 function update() {
   if (!ball.active) return;
+
+  for (let i = 0; i < 2; i += 1) {
+    stepPhysics(fixedStep);
+  }
+}
+
+function stepPhysics(_dt: number) {
   ball.vy += gravity;
-  ball.vx *= damping;
-  ball.vy *= damping;
+  ball.vx *= airFriction;
+  ball.vy *= airFriction;
   ball.x += ball.vx;
   ball.y += ball.vy;
 
   if (ball.x < ball.radius || ball.x > W - ball.radius) {
-    ball.vx *= -0.9;
+    ball.vx *= -wallBounce;
     ball.x = Math.max(ball.radius, Math.min(W - ball.radius, ball.x));
+    playTone(120, 0.035, 'square', 0.025);
   }
   if (ball.y < ball.radius) {
-    ball.vy *= -0.9;
+    ball.vy *= -wallBounce;
     ball.y = ball.radius;
+    playTone(140, 0.035, 'square', 0.025);
   }
 
-  for (const peg of pegs) {
-    if (peg.hit) continue;
-    const dx = ball.x - peg.x;
-    const dy = ball.y - peg.y;
-    const dist = Math.hypot(dx, dy);
-    const min = ball.radius + peg.radius;
-    if (dist < min) {
-      peg.hit = true;
-      const nx = dx / (dist || 1);
-      const ny = dy / (dist || 1);
-      const dot = ball.vx * nx + ball.vy * ny;
-      ball.vx = (ball.vx - 2 * dot * nx) * 1.04;
-      ball.vy = (ball.vy - 2 * dot * ny) * 1.04;
-      ball.x = peg.x + nx * min;
-      ball.y = peg.y + ny * min;
-      score += peg.kind === 'story' ? 100 : peg.kind === 'spark' ? 50 : 25;
-      message = peg.kind === 'story' ? 'Gás instável neutralizado!' : peg.kind === 'spark' ? 'Ansiedade quântica ativada!' : 'Burrice concentrada ricocheteou!';
-      syncHud();
-    }
+  const collisions = pegs
+    .filter((peg) => !peg.hit)
+    .map((peg) => ({ peg, dist: Math.hypot(ball.x - peg.x, ball.y - peg.y) }))
+    .filter(({ peg, dist }) => dist < ball.radius + peg.radius)
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, 2);
+
+  for (const { peg, dist } of collisions) {
+    collidePeg(peg, dist);
   }
 
   if (ball.y > H + 80) {
@@ -167,7 +187,36 @@ function update() {
     ball.vy = 0;
     const remaining = pegs.filter((p) => p.kind === 'story' && !p.hit).length;
     message = remaining === 0 ? 'Invasão fedorrenta contida!' : shots > 0 ? 'A fenda ainda pulsa. Mire de novo.' : 'Fim de rodada. Pressione R para reabrir os termos.';
+    if (remaining === 0) playWin();
   }
+}
+
+function collidePeg(peg: Peg, dist: number) {
+  if (peg.hit) return;
+  peg.hit = true;
+  const dx = ball.x - peg.x;
+  const dy = ball.y - peg.y;
+  const nx = dx / (dist || 1);
+  const ny = dy / (dist || 1);
+  const min = ball.radius + peg.radius;
+  const incoming = ball.vx * nx + ball.vy * ny;
+
+  if (incoming < 0) {
+    ball.vx = (ball.vx - 2 * incoming * nx) * pegBounce;
+    ball.vy = (ball.vy - 2 * incoming * ny) * pegBounce;
+  } else {
+    ball.vx += nx * 0.45;
+    ball.vy += ny * 0.45;
+  }
+
+  ball.x = peg.x + nx * (min + 0.4);
+  ball.y = peg.y + ny * (min + 0.4);
+  score += peg.kind === 'story' ? 100 : peg.kind === 'spark' ? 60 : 35;
+  message = peg.kind === 'story' ? 'Gás instável neutralizado!' : peg.kind === 'spark' ? 'Ansiedade quântica ativada!' : 'Burrice concentrada ricocheteou!';
+  const freq = peg.kind === 'story' ? 620 : peg.kind === 'spark' ? 880 : 420;
+  playTone(freq, 0.055, 'sine', 0.055);
+  playTone(freq * 1.5, 0.04, 'triangle', 0.025, 0.02);
+  syncHud();
 }
 
 function draw() {
@@ -184,6 +233,7 @@ function draw() {
   drawCity();
   drawBucket();
   drawLauncher();
+  drawTrajectory();
 
   for (const peg of pegs) drawPeg(peg);
   drawBall();
@@ -254,12 +304,12 @@ function drawLauncher() {
   const dx = aim.x - launcher.x;
   const dy = aim.y - launcher.y;
   const len = Math.hypot(dx, dy) || 1;
-  ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
   ctx.lineWidth = 3;
   ctx.setLineDash([8, 10]);
   ctx.beginPath();
   ctx.moveTo(launcher.x, launcher.y);
-  ctx.lineTo(launcher.x + (dx / len) * 105, launcher.y + (dy / len) * 105);
+  ctx.lineTo(launcher.x + (dx / len) * 116, launcher.y + (dy / len) * 116);
   ctx.stroke();
   ctx.setLineDash([]);
 
@@ -273,13 +323,42 @@ function drawLauncher() {
   ctx.fillText('BUF', launcher.x, launcher.y + 4);
 }
 
+function drawTrajectory() {
+  if (ball.active) return;
+  const shot = getShotVector(10.9);
+  let px = launcher.x;
+  let py = launcher.y;
+  let vx = shot.vx;
+  let vy = shot.vy;
+  ctx.save();
+  ctx.fillStyle = 'rgba(236, 252, 203, 0.58)';
+  for (let i = 0; i < 54; i += 1) {
+    vy += gravity;
+    vx *= airFriction;
+    vy *= airFriction;
+    px += vx * 2;
+    py += vy * 2;
+    if (px < 10 || px > W - 10 || py > H) break;
+    if (i % 3 === 0) {
+      ctx.globalAlpha = Math.max(0.08, 0.55 - i * 0.008);
+      ctx.beginPath();
+      ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 function drawPeg(peg: Peg) {
   ctx.save();
-  ctx.globalAlpha = peg.hit ? 0.16 : 1;
+  ctx.globalAlpha = peg.hit ? 0.11 : 1;
+  ctx.shadowColor = theme.pegs[peg.kind];
+  ctx.shadowBlur = peg.hit ? 0 : 12;
   ctx.fillStyle = theme.pegs[peg.kind];
   ctx.beginPath();
   ctx.arc(peg.x, peg.y, peg.radius, 0, Math.PI * 2);
   ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.strokeStyle = 'rgba(255,255,255,0.72)';
   ctx.lineWidth = 2;
   ctx.stroke();
@@ -287,21 +366,52 @@ function drawPeg(peg: Peg) {
 }
 
 function drawBall() {
+  ctx.save();
+  ctx.shadowColor = '#bef264';
+  ctx.shadowBlur = ball.active ? 16 : 8;
   ctx.fillStyle = theme.ball;
   ctx.beginPath();
   ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
   ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.strokeStyle = '#111827';
   ctx.stroke();
+  ctx.restore();
 }
 
 function drawMessage() {
   ctx.fillStyle = 'rgba(15,23,42,0.72)';
-  ctx.fillRect(24, H - 64, 420, 40);
+  ctx.fillRect(24, H - 64, 520, 40);
   ctx.fillStyle = '#e5e7eb';
   ctx.font = '600 16px system-ui';
   ctx.textAlign = 'left';
   ctx.fillText(message, 42, H - 39);
+}
+
+function ensureAudio() {
+  audio ??= new AudioContext();
+  if (audio.state === 'suspended') void audio.resume();
+}
+
+function playTone(frequency: number, duration: number, type: OscillatorType, volume: number, delay = 0) {
+  if (!audio) return;
+  const start = audio.currentTime + delay;
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(frequency, start);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(40, frequency * 0.72), start + duration);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  osc.connect(gain);
+  gain.connect(audio.destination);
+  osc.start(start);
+  osc.stop(start + duration + 0.02);
+}
+
+function playWin() {
+  [392, 523, 659, 784].forEach((freq, i) => playTone(freq, 0.12, 'triangle', 0.06, i * 0.08));
 }
 
 function frame() {
