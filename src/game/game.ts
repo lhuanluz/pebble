@@ -83,6 +83,10 @@ export class PebbleGame {
       if (event.key === ' ') this.primaryAction();
       if (event.key === 'ArrowLeft') this.pickCharacter(-1);
       if (event.key === 'ArrowRight') this.pickCharacter(1);
+      if (this.state === 'start' && /^[1-5]$/.test(event.key)) {
+        this.loadLevel(Number(event.key) - 1);
+        this.message = this.level.scene;
+      }
     });
   }
 
@@ -642,7 +646,7 @@ export class PebbleGame {
     this.ctx.fillText(this.state === 'start' ? this.level.title : this.message, W / 2, 260);
     this.ctx.font = '500 16px system-ui';
     this.ctx.fillStyle = '#cbd5e1';
-    const helper = this.state === 'start' ? '←/→ troca personagem • clique para começar' : this.state === 'level-clear' ? 'Clique para avançar' : 'Pressione R ou clique para reiniciar';
+    const helper = this.state === 'start' ? '←/→ troca personagem • 1–5 escolhe fase • clique para começar' : this.state === 'level-clear' ? 'Clique para avançar' : 'Pressione R ou clique para reiniciar';
     this.ctx.fillText(helper, W / 2, 310);
     this.ctx.fillStyle = this.character.color;
     this.ctx.font = '800 18px system-ui';
