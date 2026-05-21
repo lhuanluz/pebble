@@ -95,6 +95,8 @@ p {
   border-radius: 28px;
   background: #111827;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  touch-action: none;
+  user-select: none;
 }
 
 .controls {
@@ -121,4 +123,6 @@ kbd {
 @media (max-width: 760px) {
   .hud, .controls { flex-direction: column; align-items: stretch; }
   .stats { justify-content: flex-start; }
+  .stats span { min-width: 96px; padding: 10px 12px; }
+  h1 { font-size: clamp(2rem, 12vw, 3.5rem); }
 }

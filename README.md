@@ -4,14 +4,20 @@ Um protótipo web arcade inspirado em *Peggle*, com tema planejado para o materi
 
 ## Status
 
-MVP inicial jogável:
+Protótipo jogável evoluído:
 
-- Mira com mouse
+- Mira com mouse/toque
 - Disparo com click ou espaço
-- Física simples com gravidade/ricochete
-- Pegs por tipo (`story`, `spark`, `anchor`)
-- Pontuação, tiros restantes e alvos restantes
+- Física lenta estilo Peggle, com ricochete controlado
+- Cinco fases inspiradas no PEIDE: quarto gamer, Bolão, Planeta Eg, fábrica e fenda final
+- Personagens selecionáveis: Diego, Digueu, Felipinho e Bolão
+- Pegs por tipo (`story`, `spark`, `anchor`, `villain`)
+- Som procedural de peido por impacto/combo
+- Partículas de gás, bucket móvel, bônus de tiro e tela de resultado
+- Pontuação, tiros, fase, personagem e alvos restantes
 - Reset com `R`
+
+Deploy: https://pebble-ten.vercel.app
 
 > O PDF de referência foi usado apenas localmente para orientar a direção visual/textual. O arquivo fonte e renders extraídos não são versionados no repo público.
 
@@ -30,7 +36,7 @@ npm run build
 
 ## Próximos passos
 
-1. Separar engine, levels e theme em módulos próprios.
-2. Adicionar fases, tela inicial e progressão.
-3. Criar arte própria inspirada no clima do PEIDE sem depender do PDF bruto.
-4. Ajustar física/fun factor com playtests curtos.
+1. Criar sprites/arte própria para personagens e pegs especiais.
+2. Adicionar persistência de high score local.
+3. Balancear quantidade de tiros/fases com playtests.
+4. Evoluir para fases com obstáculos reais, não só pegs.

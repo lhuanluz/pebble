@@ -27,3 +27,4 @@ dist-ssr
 /docs/*.pdf
 /docs/peide.txt
 /docs/peide-pages/
+.vercel
