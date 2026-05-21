@@ -13,7 +13,7 @@ MVP inicial jogável:
 - Pontuação, tiros restantes e alvos restantes
 - Reset com `R`
 
-> O PDF enviado no Slack não ficou acessível para download pelo Forge. A camada temática está isolada no código para receber nomes, estética, frases e fases do PEIDE assim que o arquivo estiver acessível.
+> O PDF de referência foi usado apenas localmente para orientar a direção visual/textual. O arquivo fonte e renders extraídos não são versionados no repo público.
 
 ## Desenvolvimento
 
@@ -30,7 +30,7 @@ npm run build
 
 ## Próximos passos
 
-1. Importar o conteúdo do `PEIDE VOL 1.pdf` para criar um theme pack real.
-2. Separar engine, levels e theme em módulos próprios.
-3. Adicionar fases, tela inicial e progressão.
+1. Separar engine, levels e theme em módulos próprios.
+2. Adicionar fases, tela inicial e progressão.
+3. Criar arte própria inspirada no clima do PEIDE sem depender do PDF bruto.
 4. Ajustar física/fun factor com playtests curtos.

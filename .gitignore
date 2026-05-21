@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Source reference files not committed to public repo
+/docs/*.pdf
+/docs/peide.txt
+/docs/peide-pages/

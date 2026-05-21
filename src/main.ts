@@ -14,16 +14,16 @@ type Theme = {
 };
 
 const theme: Theme = {
-  title: 'Pebble: PEIDE Table',
-  subtitle: 'Protótipo arcade inspirado em Peggle. O pacote visual/textual do PEIDE entra quando o PDF estiver acessível.',
-  launcher: '#f7c948',
-  ball: '#f9fafb',
+  title: 'PEBBLE: A Ruptura da Bufa',
+  subtitle: 'Um pachinko caótico de gás cósmico, termos duvidosos e decisões gamer irreversíveis.',
+  launcher: '#f97316',
+  ball: '#ecfccb',
   pegs: {
-    story: '#ff6b6b',
-    spark: '#48dbfb',
-    anchor: '#7bed9f',
+    story: '#a3e635',
+    spark: '#22d3ee',
+    anchor: '#facc15',
   },
-  winLine: 'Limpe todos os pegs vermelhos para fechar a rodada.',
+  winLine: 'Estoure os pegs verdes para selar a fenda fedorrenta antes que a sala vire outro universo.',
 };
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -33,7 +33,7 @@ app.innerHTML = `
   <main class="shell">
     <section class="hud">
       <div>
-        <p class="eyebrow">pebble prototype</p>
+        <p class="eyebrow">volume 1 • termos de responsabilidade</p>
         <h1>${theme.title}</h1>
         <p>${theme.subtitle}</p>
       </div>
@@ -71,7 +71,7 @@ let score = 0;
 let shots = 8;
 let pegs: Peg[] = [];
 let ball: Ball = { x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 9, active: false };
-let message = 'Mire e dispare.';
+let message = 'Assine os termos e mire na fenda.';
 
 function makeLevel() {
   const level: Peg[] = [];
@@ -92,7 +92,7 @@ function reset() {
   shots = 8;
   pegs = makeLevel();
   ball = { x: launcher.x, y: launcher.y, vx: 0, vy: 0, radius: 9, active: false };
-  message = 'Mire e dispare.';
+  message = 'Assine os termos e mire na fenda.';
   syncHud();
 }
 
@@ -154,7 +154,7 @@ function update() {
       ball.x = peg.x + nx * min;
       ball.y = peg.y + ny * min;
       score += peg.kind === 'story' ? 100 : peg.kind === 'spark' ? 50 : 25;
-      message = peg.kind === 'story' ? 'Alvo narrativo limpo!' : 'Ricochete!';
+      message = peg.kind === 'story' ? 'Gás instável neutralizado!' : peg.kind === 'spark' ? 'Ansiedade quântica ativada!' : 'Burrice concentrada ricocheteou!';
       syncHud();
     }
   }
@@ -166,19 +166,22 @@ function update() {
     ball.vx = 0;
     ball.vy = 0;
     const remaining = pegs.filter((p) => p.kind === 'story' && !p.hit).length;
-    message = remaining === 0 ? 'Rodada vencida!' : shots > 0 ? 'Mire o próximo disparo.' : 'Fim de rodada. Pressione R.';
+    message = remaining === 0 ? 'Invasão fedorrenta contida!' : shots > 0 ? 'A fenda ainda pulsa. Mire de novo.' : 'Fim de rodada. Pressione R para reabrir os termos.';
   }
 }
 
 function draw() {
   const gradient = ctx.createLinearGradient(0, 0, 0, H);
-  gradient.addColorStop(0, '#111827');
-  gradient.addColorStop(0.62, '#25153d');
+  gradient.addColorStop(0, '#050816');
+  gradient.addColorStop(0.42, '#052e16');
+  gradient.addColorStop(0.72, '#1e1b4b');
   gradient.addColorStop(1, '#0f172a');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, W, H);
 
   drawStars();
+  drawVortex();
+  drawCity();
   drawBucket();
   drawLauncher();
 
@@ -199,13 +202,52 @@ function drawStars() {
   ctx.restore();
 }
 
+function drawVortex() {
+  ctx.save();
+  ctx.translate(W / 2, 118);
+  for (let i = 0; i < 42; i += 1) {
+    const radius = 18 + i * 3.1;
+    ctx.rotate(0.1);
+    ctx.strokeStyle = `rgba(163, 230, 53, ${0.42 - i * 0.007})`;
+    ctx.lineWidth = Math.max(1, 8 - i * 0.14);
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, i * 0.22, Math.PI * 1.4 + i * 0.22);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#020617';
+  ctx.beginPath();
+  ctx.arc(0, 0, 28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCity() {
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+  for (let i = 0; i < 18; i += 1) {
+    const width = 28 + ((i * 13) % 34);
+    const height = 50 + ((i * 29) % 120);
+    const x = i * 58 - 18;
+    const y = H - 72 - height;
+    ctx.fillStyle = i % 3 === 0 ? '#111827' : '#1f2937';
+    ctx.fillRect(x, y, width, height);
+    ctx.fillStyle = '#facc15';
+    for (let wy = y + 12; wy < y + height - 8; wy += 20) {
+      for (let wx = x + 7; wx < x + width - 6; wx += 14) {
+        if ((wx + wy + i) % 3 === 0) ctx.fillRect(wx, wy, 4, 5);
+      }
+    }
+  }
+  ctx.restore();
+}
+
 function drawBucket() {
-  ctx.fillStyle = '#0ea5e9';
-  ctx.fillRect(W / 2 - 88, H - 26, 176, 16);
-  ctx.fillStyle = '#7dd3fc';
-  ctx.font = '700 14px system-ui';
+  ctx.fillStyle = '#65a30d';
+  ctx.fillRect(W / 2 - 104, H - 28, 208, 18);
+  ctx.fillStyle = '#d9f99d';
+  ctx.font = '800 14px system-ui';
   ctx.textAlign = 'center';
-  ctx.fillText('BONUS', W / 2, H - 32);
+  ctx.fillText('BUEIRO DIMENSIONAL', W / 2, H - 36);
 }
 
 function drawLauncher() {
@@ -228,7 +270,7 @@ function drawLauncher() {
   ctx.fillStyle = '#3b2f00';
   ctx.font = '700 12px system-ui';
   ctx.textAlign = 'center';
-  ctx.fillText('PEB', launcher.x, launcher.y + 4);
+  ctx.fillText('BUF', launcher.x, launcher.y + 4);
 }
 
 function drawPeg(peg: Peg) {
