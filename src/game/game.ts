@@ -13,6 +13,8 @@ const H = 640;
 const airFriction = 0.9992;
 const wallBounce = 0.82;
 const pegBounce = 0.84;
+const physicsSteps = 1;
+const slowmoFrameSkip = 2;
 const launcher: Vec = { x: W / 2, y: 46 };
 
 export class PebbleGame {
@@ -40,6 +42,7 @@ export class PebbleGame {
   private floatingTexts: FloatingText[] = [];
   private trails: TrailDot[] = [];
   private activeBall: Ball | null = null;
+  private frame = 0;
 
   private canvas: HTMLCanvasElement;
   private hud: { score: HTMLElement; shots: HTMLElement; targets: HTMLElement; level: HTMLElement; character: HTMLElement };
@@ -208,7 +211,8 @@ export class PebbleGame {
   }
 
   private update() {
-    const steps = this.slowmo > 0 ? 1 : 2;
+    this.frame += 1;
+    const steps = this.slowmo > 0 && this.frame % slowmoFrameSkip !== 0 ? 0 : physicsSteps;
     for (const ball of this.balls.filter((b) => b.active)) {
       this.activeBall = ball;
       for (let i = 0; i < steps; i += 1) this.stepPhysics();
@@ -482,8 +486,8 @@ export class PebbleGame {
       vy += this.level.gravity;
       vx *= airFriction;
       vy *= airFriction;
-      px += vx * 2;
-      py += vy * 2;
+      px += vx * physicsSteps;
+      py += vy * physicsSteps;
       if (px < 10 || px > W - 10 || py > H) break;
       if (i % 3 === 0) {
         this.ctx.globalAlpha = Math.max(0.08, 0.55 - i * 0.008);
