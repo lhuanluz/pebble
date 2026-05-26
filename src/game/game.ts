@@ -190,10 +190,15 @@ export class PebbleGame {
     return kind === 'villain' ? '#a855f7' : kind === 'multiball' ? '#fb7185' : kind === 'slowmo' ? '#22d3ee' : kind === 'bumper' ? '#f97316' : kind === 'spark' ? this.level.palette.accent : kind === 'anchor' ? '#facc15' : this.level.palette.peg;
   }
 
-  private shotVector(power = this.level.power) {
+  private aimVector() {
     const dx = this.aim.x - launcher.x;
-    const dy = Math.max(90, this.aim.y - launcher.y);
+    const dy = this.aim.y - launcher.y;
     const len = Math.hypot(dx, dy) || 1;
+    return { dx, dy, len };
+  }
+
+  private shotVector(power = this.level.power) {
+    const { dx, dy, len } = this.aimVector();
     return { vx: (dx / len) * power, vy: (dy / len) * power };
   }
 
@@ -453,9 +458,7 @@ export class PebbleGame {
   }
 
   private drawLauncher() {
-    const dx = this.aim.x - launcher.x;
-    const dy = this.aim.y - launcher.y;
-    const len = Math.hypot(dx, dy) || 1;
+    const { dx, dy, len } = this.aimVector();
     this.ctx.strokeStyle = 'rgba(255,255,255,0.5)';
     this.ctx.lineWidth = 3;
     this.ctx.setLineDash([8, 10]);
