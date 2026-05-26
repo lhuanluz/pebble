@@ -109,6 +109,16 @@ p {
 
 .controls p { margin: 0; }
 
+.deploy-info {
+  margin: 12px 0 0;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
 kbd {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-bottom-width: 3px;
@@ -124,5 +134,6 @@ kbd {
   .hud, .controls { flex-direction: column; align-items: stretch; }
   .stats { justify-content: flex-start; }
   .stats span { min-width: 96px; padding: 10px 12px; }
+  .deploy-info { text-align: left; }
   h1 { font-size: clamp(2rem, 12vw, 3.5rem); }
 }

@@ -4,6 +4,10 @@ import { PebbleGame } from './game/game';
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app');
 
+const deployedAt = import.meta.env.VITE_DEPLOYED_AT || 'build local';
+const commitSha = import.meta.env.VITE_COMMIT_SHA;
+const deployLabel = commitSha ? `${deployedAt} • ${commitSha.slice(0, 7)}` : deployedAt;
+
 app.innerHTML = `
   <main class="shell">
     <section class="hud">
@@ -25,6 +29,7 @@ app.innerHTML = `
       <p>Limpe os alvos verdes/roxos para avançar pelas fases do PEIDE.</p>
       <p><kbd>Mouse/toque</kbd> mira • <kbd>Click</kbd>/<kbd>Espaço</kbd> dispara • <kbd>←</kbd><kbd>→</kbd> personagem • <kbd>R</kbd> reinicia</p>
     </section>
+    <p class="deploy-info">Último deploy: ${deployLabel}</p>
   </main>
 `;
 

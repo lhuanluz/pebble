@@ -14,6 +14,7 @@ const airFriction = 0.9992;
 const wallBounce = 0.82;
 const pegBounce = 0.84;
 const physicsSteps = 1;
+const movementScale = 0.68;
 const slowmoFrameSkip = 2;
 const launcher: Vec = { x: W / 2, y: 46 };
 
@@ -235,8 +236,8 @@ export class PebbleGame {
     ball.vy += this.level.gravity * (this.slowmo > 0 ? 0.72 : 1);
     ball.vx *= airFriction;
     ball.vy *= airFriction;
-    ball.x += ball.vx;
-    ball.y += ball.vy;
+    ball.x += ball.vx * movementScale;
+    ball.y += ball.vy * movementScale;
 
     if (ball.x < ball.radius || ball.x > W - ball.radius) {
       ball.vx *= -wallBounce;
@@ -486,8 +487,8 @@ export class PebbleGame {
       vy += this.level.gravity;
       vx *= airFriction;
       vy *= airFriction;
-      px += vx * physicsSteps;
-      py += vy * physicsSteps;
+      px += vx * physicsSteps * movementScale;
+      py += vy * physicsSteps * movementScale;
       if (px < 10 || px > W - 10 || py > H) break;
       if (i % 3 === 0) {
         this.ctx.globalAlpha = Math.max(0.08, 0.55 - i * 0.008);
