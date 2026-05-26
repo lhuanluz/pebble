@@ -11,10 +11,10 @@ type GameState = 'start' | 'playing' | 'level-clear' | 'game-over' | 'finished';
 const W = 960;
 const H = 640;
 const airFriction = 0.9992;
-const wallBounce = 0.82;
-const pegBounce = 0.84;
+const wallBounce = 0.68;
+const pegBounce = 0.66;
 const physicsSteps = 1;
-const movementScale = 0.68;
+const movementScale = 0.52;
 const slowmoFrameSkip = 2;
 const launcher: Vec = { x: W / 2, y: 46 };
 
@@ -275,13 +275,13 @@ export class PebbleGame {
     const ny = dy / (dist || 1);
     const min = ball.radius + peg.radius;
     const incoming = ball.vx * nx + ball.vy * ny;
-    const bounce = peg.kind === 'bumper' ? 1.18 : pegBounce;
+    const bounce = peg.kind === 'bumper' ? 0.9 : pegBounce;
     if (incoming < 0) {
       ball.vx = (ball.vx - 2 * incoming * nx) * bounce;
       ball.vy = (ball.vy - 2 * incoming * ny) * bounce;
     } else {
-      ball.vx += nx * (peg.kind === 'bumper' ? 0.8 : 0.16);
-      ball.vy += ny * (peg.kind === 'bumper' ? 0.8 : 0.16);
+      ball.vx += nx * (peg.kind === 'bumper' ? 0.45 : 0.1);
+      ball.vy += ny * (peg.kind === 'bumper' ? 0.45 : 0.1);
     }
     ball.x = peg.x + nx * (min + 0.4);
     ball.y = peg.y + ny * (min + 0.4);
@@ -311,8 +311,8 @@ export class PebbleGame {
   private spawnMultiball(source: Ball) {
     if (this.balls.filter((b) => b.active).length >= 4) return;
     this.balls.push(
-      { ...source, vx: source.vx * 0.72 + 1.9, vy: source.vy * 0.82 - 1.2, active: true },
-      { ...source, vx: source.vx * 0.72 - 1.9, vy: source.vy * 0.82 - 1.2, active: true },
+      { ...source, vx: source.vx * 0.62 + 1.15, vy: source.vy * 0.7 - 0.7, active: true },
+      { ...source, vx: source.vx * 0.62 - 1.15, vy: source.vy * 0.7 - 0.7, active: true },
     );
     this.message = 'MULTIBUFA! Duas bolas extras entraram na fenda.';
   }
