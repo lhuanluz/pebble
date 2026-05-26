@@ -74,14 +74,11 @@ export class PebbleGame {
   }
 
   private bind() {
-    this.canvas.addEventListener('pointermove', (event) => {
-      const rect = this.canvas.getBoundingClientRect();
-      this.aim = {
-        x: ((event.clientX - rect.left) / rect.width) * W,
-        y: ((event.clientY - rect.top) / rect.height) * H,
-      };
+    this.canvas.addEventListener('pointermove', (event) => this.updateAim(event));
+    this.canvas.addEventListener('pointerdown', (event) => {
+      this.updateAim(event);
+      this.primaryAction();
     });
-    this.canvas.addEventListener('pointerdown', () => this.primaryAction());
     window.addEventListener('keydown', (event) => {
       if (event.key.toLowerCase() === 'r') this.restart();
       if (event.key === ' ') this.primaryAction();
@@ -92,6 +89,14 @@ export class PebbleGame {
         this.message = this.level.scene;
       }
     });
+  }
+
+  private updateAim(event: PointerEvent) {
+    const rect = this.canvas.getBoundingClientRect();
+    this.aim = {
+      x: ((event.clientX - rect.left) / rect.width) * W,
+      y: ((event.clientY - rect.top) / rect.height) * H,
+    };
   }
 
   private primaryAction() {
@@ -487,18 +492,18 @@ export class PebbleGame {
     this.ctx.save();
     this.ctx.fillStyle = 'rgba(236, 252, 203, 0.58)';
     for (let i = 0; i < 58; i += 1) {
-      vy += this.level.gravity;
-      vx *= airFriction;
-      vy *= airFriction;
-      px += vx * physicsSteps * movementScale;
-      py += vy * physicsSteps * movementScale;
-      if (px < 10 || px > W - 10 || py > H) break;
       if (i % 3 === 0) {
         this.ctx.globalAlpha = Math.max(0.08, 0.55 - i * 0.008);
         this.ctx.beginPath();
         this.ctx.arc(px, py, 2.2, 0, Math.PI * 2);
         this.ctx.fill();
       }
+      vy += this.level.gravity;
+      vx *= airFriction;
+      vy *= airFriction;
+      px += vx * physicsSteps * movementScale;
+      py += vy * physicsSteps * movementScale;
+      if (px < 10 || px > W - 10 || py > H) break;
     }
     this.ctx.restore();
   }
