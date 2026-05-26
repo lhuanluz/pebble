@@ -12,7 +12,7 @@ const W = 960;
 const H = 640;
 const airFriction = 0.9992;
 const wallBounce = 0.68;
-const pegBounce = 0.66;
+const pegBounce = 0.48;
 const physicsSteps = 1;
 const movementScale = 0.52;
 const slowmoFrameSkip = 2;
@@ -275,13 +275,13 @@ export class PebbleGame {
     const ny = dy / (dist || 1);
     const min = ball.radius + peg.radius;
     const incoming = ball.vx * nx + ball.vy * ny;
-    const bounce = peg.kind === 'bumper' ? 0.9 : pegBounce;
+    const bounce = peg.kind === 'bumper' ? 0.72 : pegBounce;
     if (incoming < 0) {
       ball.vx = (ball.vx - 2 * incoming * nx) * bounce;
       ball.vy = (ball.vy - 2 * incoming * ny) * bounce;
     } else {
-      ball.vx += nx * (peg.kind === 'bumper' ? 0.45 : 0.1);
-      ball.vy += ny * (peg.kind === 'bumper' ? 0.45 : 0.1);
+      ball.vx += nx * (peg.kind === 'bumper' ? 0.28 : 0.04);
+      ball.vy += ny * (peg.kind === 'bumper' ? 0.28 : 0.04);
     }
     ball.x = peg.x + nx * (min + 0.4);
     ball.y = peg.y + ny * (min + 0.4);
